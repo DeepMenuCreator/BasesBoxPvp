@@ -1,0 +1,15 @@
+name: BasesPlugin
+version: '${project.version}'
+main: com.github.yourname.basesplugin.BasesPlugin
+api-version: '1.21'
+depend: [PlayerPoints]
+
+commands:
+  base:
+    description: Меню базы
+    usage: /<command> [botspawn <mob/ник>]
+
+permissions:
+  basesplugin.admin.bot:
+    description: Спавн ботов-меню
+    default: op
