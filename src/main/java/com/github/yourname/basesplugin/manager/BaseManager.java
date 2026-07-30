@@ -168,6 +168,41 @@ public class BaseManager {
         player.sendMessage(ChatColor.GREEN + "Телепортация на базу...");
     }
 
+    public void grantBase(UUID uuid, int level) {
+        Base existing = bases.get(uuid);
+        Location loc;
+        if (existing != null) {
+            clearOldPlatform(existing.getLocation(), existing.getLevel());
+            loc = existing.getLocation();
+        } else {
+            int spacing = plugin.getConfig().getInt("base-spacing", 50);
+            loc = new Location(baseWorld, nextIndex * spacing, 64, 0);
+            nextIndex++;
+        }
+        Base base = new Base(uuid, level, loc);
+        bases.put(uuid, base);
+        buildPlatform(loc, level);
+        save();
+    }
+
+    public void deleteBase(UUID uuid) {
+        Base base = bases.remove(uuid);
+        if (base != null) {
+            clearOldPlatform(base.getLocation(), base.getLevel());
+            save();
+        }
+    }
+
+    public void setBaseLevel(UUID uuid, int newLevel) {
+        Base base = bases.get(uuid);
+        if (base == null) return;
+        if (newLevel < 1 || newLevel > getMaxLevel()) return;
+        clearOldPlatform(base.getLocation(), base.getLevel());
+        base.setLevel(newLevel);
+        buildPlatform(base.getLocation(), newLevel);
+        save();
+    }
+
     private String locKey(Location loc) {
         return loc.getWorld().getName() + ";" + loc.getBlockX() + ";" + loc.getBlockY() + ";" + loc.getBlockZ();
     }
@@ -269,5 +304,5 @@ public class BaseManager {
             this.size = size;
         }
     }
-                    }
-    
+                }
+                
