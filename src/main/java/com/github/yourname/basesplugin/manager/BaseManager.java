@@ -31,10 +31,11 @@ public class BaseManager {
 
     private void initLevels() {
         levels.put(1, new LevelData(500, 5));
-        levels.put(2, new LevelData(900, 8));
-        levels.put(3, new LevelData(1200, 10));
-        levels.put(4, new LevelData(1400, 13));
-        levels.put(5, new LevelData(1600, 15));
+        levels.put(2, new LevelData(900, 7));
+        levels.put(3, new LevelData(1200, 9));
+        levels.put(4, new LevelData(1400, 11));
+        levels.put(5, new LevelData(1600, 13));
+        levels.put(6, new LevelData(1800, 15));
     }
 
     private void setupWorld() {
@@ -102,7 +103,7 @@ public class BaseManager {
     }
 
     public int getMaxLevel() {
-        return 5;
+        return 6;
     }
 
     public int getPriceForLevel(int level) {
@@ -192,7 +193,6 @@ public class BaseManager {
         int cy = center.getBlockY();
         int cz = center.getBlockZ();
 
-        // Остров: пол + тело
         for (int x = -size; x <= size; x++) {
             for (int z = -size; z <= size; z++) {
                 double dist = Math.sqrt(x * x + z * z);
@@ -200,7 +200,6 @@ public class BaseManager {
                 // Пол (трава)
                 if (dist <= radius) {
                     setProtected(w, cx + x, cy, cz + z, Material.GRASS_BLOCK);
-                    // Под ним грязь
                     setProtected(w, cx + x, cy - 1, cz + z, Material.DIRT);
                 }
 
@@ -213,11 +212,16 @@ public class BaseManager {
                     }
                 }
 
-                // Барьер-стена по периметру
+                // Барьер-стена (10 блоков высотой: от -1 до +8)
                 if (dist >= radius - 1.0 && dist <= radius + 0.8) {
-                    for (int h = -1; h <= 3; h++) {
+                    for (int h = -1; h <= 8; h++) {
                         setProtected(w, cx + x, cy + h, cz + z, Material.BARRIER);
                     }
+                }
+
+                // Барьер-потолок (закрытая крыша)
+                if (dist <= radius + 0.8) {
+                    setProtected(w, cx + x, cy + 9, cz + z, Material.BARRIER);
                 }
             }
         }
@@ -238,7 +242,7 @@ public class BaseManager {
             for (int z = -size - 2; z <= size + 2; z++) {
                 double dist = Math.sqrt(x * x + z * z);
                 if (dist > radius) continue;
-                for (int y = cy - 6; y <= cy + 4; y++) {
+                for (int y = cy - 6; y <= cy + 10; y++) {
                     Location loc = new Location(w, cx + x, y, cz + z);
                     if (protectedBlocks.contains(locKey(loc))) {
                         removeProtection(w, cx + x, y, cz + z);
@@ -265,4 +269,5 @@ public class BaseManager {
             this.size = size;
         }
     }
-}
+                    }
+    
