@@ -8,8 +8,29 @@ commands:
   base:
     description: Меню базы
     usage: /<command> [botspawn <mob/ник>]
+  grantbase:
+    description: Выдать базу игроку
+    usage: /grantbase <игрок> <уровень>
+    permission: basesplugin.admin.grant
+  delbase:
+    description: Удалить базу игрока
+    usage: /delbase <игрок> <причина>
+    permission: basesplugin.admin.del
+  upgradebase:
+    description: Установить уровень базы игрока
+    usage: /upgradebase <игрок> <уровень>
+    permission: basesplugin.admin.upgrade
 
 permissions:
   basesplugin.admin.bot:
     description: Спавн ботов-меню
+    default: op
+  basesplugin.admin.grant:
+    description: Выдача базы
+    default: op
+  basesplugin.admin.del:
+    description: Удаление базы
+    default: op
+  basesplugin.admin.upgrade:
+    description: Установка уровня базы
     default: op
