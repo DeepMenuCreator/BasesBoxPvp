@@ -6,6 +6,7 @@ import org.bukkit.block.Block;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,8 +26,9 @@ public class BaseManager {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "data.yml");
         initLevels();
-        load();
         setupWorld();
+        load();
+        startAutoSave();
     }
 
     private void initLevels() {
@@ -66,22 +68,50 @@ public class BaseManager {
         }
         data = YamlConfiguration.loadConfiguration(file);
         nextIndex = data.getInt("next-index", 0);
+
         if (data.contains("bases")) {
-            for (String key : data.getConfigurationSection("bases").getKeys(false)) {
-                UUID uuid = UUID.fromString(key);
-                String path = "bases." + key;
-                int level = data.getInt(path + ".level", 1);
-                Location loc = data.getLocation(path + ".location");
-                if (loc != null) {
-                    bases.put(uuid, new Base(uuid, level, loc));
-                    buildPlatform(loc, level);
+            var section = data.getConfigurationSection("bases");
+            if (section != null) {
+                for (String key : section.getKeys(false)) {
+                    try {
+                        UUID uuid = UUID.fromString(key);
+                        String path = "bases." + key;
+                        int level = data.getInt(path + ".level", 1);
+
+                        // Ручная загрузка location на случай, если getLocation не сработал
+                        Location loc = data.getLocation(path + ".location");
+                        if (loc == null && data.contains(path + ".location")) {
+                            String worldName = data.getString(path + ".location.world", "bases");
+                            double x = data.getDouble(path + ".location.x");
+                            double y = data.getDouble(path + ".location.y");
+                            double z = data.getDouble(path + ".location.z");
+                            float yaw = (float) data.getDouble(path + ".location.yaw", 0);
+                            float pitch = (float) data.getDouble(path + ".location.pitch", 0);
+                            World w = Bukkit.getWorld(worldName);
+                            if (w != null) loc = new Location(w, x, y, z, yaw, pitch);
+                        }
+
+                        if (loc != null) {
+                            bases.put(uuid, new Base(uuid, level, loc));
+                            buildPlatform(loc, level);
+                            // Корректируем nextIndex, если база стоит дальше
+                            int idx = (int) Math.round(loc.getX() / getSpacing());
+                            if (idx >= nextIndex) nextIndex = idx + 1;
+                        }
+                    } catch (IllegalArgumentException e) {
+                        plugin.getLogger().warning("Некорректный UUID в data.yml: " + key);
+                    }
                 }
             }
         }
+
+        plugin.getLogger().info("Загружено баз: " + bases.size() + ", nextIndex: " + nextIndex);
     }
 
     public void save() {
         data.set("next-index", nextIndex);
+        // Очищаем старые данные, чтобы не оставалось удалённых баз
+        data.set("bases", null);
         for (Map.Entry<UUID, Base> entry : bases.entrySet()) {
             String path = "bases." + entry.getKey().toString();
             data.set(path + ".level", entry.getValue().getLevel());
@@ -90,8 +120,22 @@ public class BaseManager {
         try {
             data.save(file);
         } catch (IOException e) {
+            plugin.getLogger().severe("Не удалось сохранить data.yml!");
             e.printStackTrace();
         }
+    }
+
+    private void startAutoSave() {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!bases.isEmpty()) save();
+            }
+        }.runTaskTimer(plugin, 6000L, 6000L); // Автосохранение каждые 5 минут
+    }
+
+    private int getSpacing() {
+        return plugin.getConfig().getInt("base-spacing", 50);
     }
 
     public boolean hasBase(UUID uuid) {
@@ -124,8 +168,7 @@ public class BaseManager {
             return;
         }
         plugin.getPointsAPI().take(uuid, price);
-        int spacing = plugin.getConfig().getInt("base-spacing", 50);
-        Location loc = new Location(baseWorld, nextIndex * spacing, 64, 0);
+        Location loc = new Location(baseWorld, nextIndex * getSpacing(), 64, 0);
         nextIndex++;
         Base base = new Base(uuid, 1, loc);
         bases.put(uuid, base);
@@ -175,8 +218,7 @@ public class BaseManager {
             clearOldPlatform(existing.getLocation(), existing.getLevel());
             loc = existing.getLocation();
         } else {
-            int spacing = plugin.getConfig().getInt("base-spacing", 50);
-            loc = new Location(baseWorld, nextIndex * spacing, 64, 0);
+            loc = new Location(baseWorld, nextIndex * getSpacing(), 64, 0);
             nextIndex++;
         }
         Base base = new Base(uuid, level, loc);
@@ -232,13 +274,11 @@ public class BaseManager {
             for (int z = -size; z <= size; z++) {
                 double dist = Math.sqrt(x * x + z * z);
 
-                // Пол (трава)
                 if (dist <= radius) {
                     setProtected(w, cx + x, cy, cz + z, Material.GRASS_BLOCK);
                     setProtected(w, cx + x, cy - 1, cz + z, Material.DIRT);
                 }
 
-                // Тело острова вниз (уменьшающийся круг)
                 for (int down = 1; down <= 4; down++) {
                     double rDown = radius * (1.0 - down * 0.22);
                     if (dist <= rDown) {
@@ -247,21 +287,18 @@ public class BaseManager {
                     }
                 }
 
-                // Барьер-стена (10 блоков высотой: от -1 до +8)
                 if (dist >= radius - 1.0 && dist <= radius + 0.8) {
                     for (int h = -1; h <= 8; h++) {
                         setProtected(w, cx + x, cy + h, cz + z, Material.BARRIER);
                     }
                 }
 
-                // Барьер-потолок (закрытая крыша)
                 if (dist <= radius + 0.8) {
                     setProtected(w, cx + x, cy + 9, cz + z, Material.BARRIER);
                 }
             }
         }
 
-        // Маяк в центре
         setProtected(w, cx, cy, cz, Material.BEACON);
     }
 
@@ -304,5 +341,5 @@ public class BaseManager {
             this.size = size;
         }
     }
-                }
-                
+    }
+                         
